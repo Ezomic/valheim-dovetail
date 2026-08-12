@@ -1,0 +1,58 @@
+using BepInEx;
+using BepInEx.Logging;
+using HarmonyLib;
+
+namespace Dovetail
+{
+    [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+    [BepInProcess("valheim.exe")]
+    public class DovetailPlugin : BaseUnityPlugin
+    {
+        public const string PluginGuid = "robbin.valheim.dovetail";
+        public const string PluginName = "Dovetail";
+        public const string PluginVersion = "1.0.0";
+        public const string PluginAuthor = "Robbin Thijssen";
+
+        internal static ManualLogSource Log;
+
+        private Harmony _harmony;
+
+        private void Awake()
+        {
+            Log = Logger;
+            DovetailConfig.Bind(Config);
+
+            _harmony = new Harmony(PluginGuid);
+            _harmony.PatchAll(typeof(ScenePatches));
+
+            Log.LogInfo(PluginName + " " + PluginVersion + " by " + PluginAuthor + " - ready.");
+        }
+
+        private void OnDestroy()
+        {
+            if (_harmony != null) _harmony.UnpatchSelf();
+        }
+
+        private void Update()
+        {
+            if (ZNetScene.instance == null) return;
+            SnapPoints.Apply();
+        }
+    }
+
+    internal static class ScenePatches
+    {
+        /// <summary>
+        /// Snap points are added to the prefabs, so this has to land before anything is
+        /// built from them. Every chest in the world - including ones loaded back out of a
+        /// save - is instantiated from these prefabs after Awake, so they all inherit the
+        /// points rather than only newly placed ones.
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(ZNetScene), "Awake")]
+        private static void AddSnapPointsOnScene()
+        {
+            SnapPoints.Apply();
+        }
+    }
+}

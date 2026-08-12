@@ -1,0 +1,10 @@
+{
+  "name": "Dovetail",
+  "author": "Robbin Thijssen",
+  "version_number": "1.0.0",
+  "website_url": "",
+  "description": "Snap points for chests, fences and anything else that will not line up.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333"
+  ]
+}
