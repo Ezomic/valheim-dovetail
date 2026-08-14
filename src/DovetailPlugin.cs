@@ -8,7 +8,7 @@ namespace Dovetail
     [BepInProcess("valheim.exe")]
     public class DovetailPlugin : BaseUnityPlugin
     {
-        public const string PluginGuid = "robbin.valheim.dovetail";
+        public const string PluginGuid = "ezomic.valheim.dovetail";
         public const string PluginName = "Dovetail";
         public const string PluginVersion = "1.0.0";
         public const string PluginAuthor = "Robbin Thijssen";
