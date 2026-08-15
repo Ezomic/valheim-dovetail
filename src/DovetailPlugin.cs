@@ -1,10 +1,12 @@
 using BepInEx;
 using BepInEx.Logging;
+using Ezomic.Core;
 using HarmonyLib;
 
 namespace Dovetail
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+    [BepInDependency("ezomic.valheim.core", BepInDependency.DependencyFlags.HardDependency)]
     // No BepInProcess. Snapping itself is placement-time and so purely client-side, but this
     // adds child transforms to shared prefabs, and a server whose prefabs differ from its
     // clients' is a difference worth not having. Harmless there, and consistent.
@@ -23,6 +25,11 @@ namespace Dovetail
         {
             Log = Logger;
             DovetailConfig.Bind(Config);
+            // Everyone, not HostOnly. Both ends have to agree about this mod, and the
+            // disagreement is silent when they do not: a client that cannot resolve a prefab
+            // hash discards the ZDO rather than erroring - destroying what is already standing
+            // in the world - and item data that differs desyncs inventories.
+            Suite.Register(PluginGuid, PluginName, PluginVersion, Config);
 
             _harmony = new Harmony(PluginGuid);
             _harmony.PatchAll(typeof(ScenePatches));
