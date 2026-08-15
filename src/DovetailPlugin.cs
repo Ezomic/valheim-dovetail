@@ -5,7 +5,9 @@ using HarmonyLib;
 namespace Dovetail
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInProcess("valheim.exe")]
+    // No BepInProcess. Snapping itself is placement-time and so purely client-side, but this
+    // adds child transforms to shared prefabs, and a server whose prefabs differ from its
+    // clients' is a difference worth not having. Harmless there, and consistent.
     public class DovetailPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "ezomic.valheim.dovetail";
