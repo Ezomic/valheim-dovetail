@@ -81,7 +81,7 @@ into the shared play profile with `valheim-own-profile\build-all.ps1`.
 
 ## Config
 
-`BepInEx\config\robbin.valheim.dovetail.cfg`
+`BepInEx\config\ezomic.valheim.dovetail.cfg`
 
 | Key | Default | What it does |
 | --- | --- | --- |
