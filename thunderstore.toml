@@ -9,7 +9,7 @@ namespace = "Ezomic"
 name = "Dovetail"
 versionNumber = "1.0.0"
 description = "Snap points for chests, fences and anything else that will not line up."
-websiteUrl = ""
+websiteUrl = "https://github.com/Ezomic/valheim-dovetail"
 containsNsfwContent = false
 
 [package.dependencies]
