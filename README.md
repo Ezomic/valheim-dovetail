@@ -79,6 +79,18 @@ dotnet build
 Deploys to the repo-local `testprofile\`. Override with `-p:ProfileDir=...`, or build it
 into the shared play profile with `valheim-own-profile\build-all.ps1`.
 
+
+## Core is optional
+
+Dovetail installs and runs on its own. [Core](https://github.com/Ezomic/valheim-core) is a
+**soft** dependency: present, it is used; absent, nothing here is degraded. Installing
+Dovetail from Thunderstore no longer installs Core with it.
+
+What Core adds is the **version gate** — a handshake that compares mod versions and build
+ids on connect and refuses a client that does not match. Without it nothing reports two ends running different builds, and this adds child transforms to shared prefabs — so a disagreement about a prefab passes unnoticed.
+
+Solo, none of that applies and Core is not needed at all.
+
 ## Config
 
 `BepInEx\config\ezomic.valheim.dovetail.cfg`
