@@ -33,11 +33,14 @@ and the mod uses [semantic versioning](https://semver.org).
   FenceSnap hand-places its gate points and ChestSnap keeps a YAML file of them. Naming a
   prefab is enough to get it snapped and skips the buildable filter, `ExcludePrefabs` still
   wins, and `Gap` and the ladder do not apply to a point given by hand.
-- **A warning for pieces the game can never find.** `Piece.GetSnapPoints` searches with
-  `LayerMask.GetMask("piece", "piece_nonsolid")`, so a modded piece left on another layer is
-  invisible to snapping however correct its points are. ChestSnap and FenceSnap both rewrite
-  such colliders onto the piece layer; this deliberately does not, because that changes what
-  they collide with and the piece belongs to whoever shipped it. It says so instead.
+- **A warning for pieces that can only snap one way.** `FindClosestSnapPoints` takes the
+  ghost's own points straight off the piece being placed, but finds *neighbours* through
+  `LayerMask.GetMask("piece", "piece_nonsolid")`. A piece whose colliders sit on another
+  layer therefore snaps fine while you place it, and cannot be snapped to once it stands.
+  Six vanilla prefabs are like this, the three gifts and the three pots, so it is one line
+  at startup rather than one per piece. ChestSnap and FenceSnap both rewrite such colliders
+  onto the piece layer; this deliberately does not, because that changes what they collide
+  with and the piece belongs to whoever shipped it. It says so instead.
 - **A ladder of snap points up each end of a fence**, so a fence line can follow sloping
   ground. Eight corners give a fence two heights to attach at, its base and a full panel up,
   and a hill needs the heights in between. Rungs run every `FenceLadderStep` metres

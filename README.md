@@ -129,13 +129,19 @@ escape hatch you could get back out of. `Gap` and the ladder do not apply, becau
 given by hand is used exactly as written. Names matching no prefab are reported at startup
 like the fence list.
 
-## Pieces the game can never find
+## Pieces that only snap one way
 
-`Piece.GetSnapPoints` finds neighbours with
+`FindClosestSnapPoints` reads the ghost's own points straight off the piece you are placing,
+with no layer check at all, but it finds *nearby* pieces with
 `Physics.OverlapSphereNonAlloc(..., s_pieceRayMask)`, and that mask is
-`LayerMask.GetMask("piece", "piece_nonsolid")`. A modded piece whose colliders were left on
-another layer is invisible to that search, so snap points on it can never be found by
-anything, however correct they are.
+`LayerMask.GetMask("piece", "piece_nonsolid")`. A piece whose colliders sit on another layer
+is invisible to that search.
+
+So those pieces snap in one direction only. Placing one lines it up against its neighbours
+exactly as it should; what fails is the reverse, where something else tries to snap to it
+after it is standing. Six vanilla prefabs are like this on a stock install, the three Yule
+gifts and the three pots, so this is reported as one line at startup rather than one per
+piece.
 
 Dovetail says so in the log and leaves it there. Both ChestSnap and FenceSnap carry a
 `FixPiece` that rewrites every collider onto the piece layer, and that is a real fix, but it

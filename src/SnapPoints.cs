@@ -55,6 +55,7 @@ namespace Dovetail
             var skipped = 0;
             var laddered = 0;
             var custom = 0;
+            var oneWay = new System.Collections.Generic.List<string>();
 
             foreach (var prefab in scene.m_prefabs)
             {
@@ -89,8 +90,17 @@ namespace Dovetail
                         "Could not snap " + prefab.name + ": " + e.Message);
                 }
 
-                WarnIfUnreachable(prefab);
+                if (!ReachableAsTarget(prefab)) oneWay.Add(prefab.name);
             }
+
+            if (oneWay.Count > 0)
+                DovetailPlugin.Log.LogWarning(
+                    "These have snap points, but none of their colliders are on the piece or "
+                    + "piece_nonsolid layer, which is where the game looks for something to "
+                    + "snap to: " + string.Join(", ", oneWay.ToArray()) + ". Placing one still "
+                    + "snaps it to its neighbours; what will not work is snapping anything to "
+                    + "it once it is standing. That is the piece's own layer setup, not "
+                    + "something this mod will change for it.");
 
             _appliedTo = scene;
             DovetailPlugin.Log.LogInfo(
@@ -104,13 +114,16 @@ namespace Dovetail
         }
 
         /// <summary>
-        /// A piece whose colliders sit outside the mask the game searches with can never be
-        /// found by the snapping code at all, so the points it just got are decoration.
+        /// A piece whose colliders sit outside the mask the game searches with can only ever
+        /// snap in one direction, so its points are half useful and it is worth saying which
+        /// half.
         ///
-        /// Piece.GetSnapPoints finds neighbours through
-        /// Physics.OverlapSphereNonAlloc(..., s_pieceRayMask), and that mask is
-        /// LayerMask.GetMask("piece", "piece_nonsolid"). A modded piece left on Default is
-        /// invisible to it.
+        /// FindClosestSnapPoints reads the ghost's own points straight off the piece being
+        /// placed, with no mask involved, and only the search for *nearby* pieces goes through
+        /// Physics.OverlapSphereNonAlloc(..., s_pieceRayMask) - which is
+        /// LayerMask.GetMask("piece", "piece_nonsolid"). So placing one of these snaps it to
+        /// its neighbours perfectly well. What does not work is the reverse: once it is
+        /// standing there, nothing else can find it to snap against.
         ///
         /// Both ChestSnap and FenceSnap carry a FixPiece that rewrites every collider onto
         /// the piece layer. This deliberately does not: moving another mod's colliders to a
@@ -118,10 +131,13 @@ namespace Dovetail
         /// effect to apply silently to somebody else's content. Saying so is this mod's
         /// existing habit - the same as it does for a fence name that matches no prefab -
         /// and it leaves the fix with whoever owns the piece.
+        ///
+        /// Reported as one line rather than one per piece. Six vanilla prefabs trip this on a
+        /// stock install (the three gifts and the three pots), and six warnings per startup
+        /// about something only Iron Gate can fix is noise, not information.
         /// </summary>
-        private static void WarnIfUnreachable(GameObject prefab)
+        private static bool ReachableAsTarget(GameObject prefab)
         {
-            var reachable = false;
             var any = false;
 
             foreach (var collider in prefab.GetComponentsInChildren<Collider>(true))
@@ -129,16 +145,11 @@ namespace Dovetail
                 if (collider.isTrigger) continue;
 
                 any = true;
-                if ((PieceMask & (1 << collider.gameObject.layer)) != 0) { reachable = true; break; }
+                if ((PieceMask & (1 << collider.gameObject.layer)) != 0) return true;
             }
 
-            if (!any || reachable) return;
-
-            DovetailPlugin.Log.LogWarning(
-                prefab.name + " has snap points now, but none of its colliders are on the "
-                + "piece or piece_nonsolid layer, which is where the game looks for something "
-                + "to snap to. Nothing will ever find them. That is the piece's own layer "
-                + "setup, not something this mod will change for it.");
+            // Nothing solid at all is a different problem, and not this one.
+            return !any;
         }
 
         private static int _pieceMask;
