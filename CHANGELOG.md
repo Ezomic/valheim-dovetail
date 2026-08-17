@@ -3,9 +3,11 @@
 Notable changes to Dovetail. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
-## [1.0.0] — 2026-08-16
+## [0.9.0] — 2026-08-16
 
-First release.
+Not released yet. Everything below is written, deployed and confirmed loading, but the
+snapping has only been loaded and not yet played. The version stays under 1.0 until it has,
+and 1.0.0 will be the release.
 
 ### Snapping
 
@@ -38,7 +40,13 @@ First release.
 - Footprints are read from collider **data** rather than from `Collider.bounds`. Prefabs sit
   inactive in `ZNetScene`, where world-space bounds have never been computed and read as
   zero — exactly when they are wanted.
-- Loads on dedicated servers, and declares to Core's version gate.
+- Loads on dedicated servers.
+- **Core is optional.** Installed, it is used: the mod joins Core's version gate, which
+  compares mod versions and build ids on connect and refuses a client that disagrees. That
+  matters here because this adds child transforms to shared prefabs. Absent, nothing is
+  degraded and the mod runs standalone, so installing Dovetail no longer pulls Core in with
+  it. A hard dependency would have been worse than no gate at all, since a missing hard
+  dependency means the plugin never loads.
 
 ### Naming
 
