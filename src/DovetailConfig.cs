@@ -24,6 +24,8 @@ namespace Dovetail
         public static ConfigEntry<string> FencePrefabs;
         public static ConfigEntry<string> ExcludePrefabs;
         public static ConfigEntry<float> Gap;
+        public static ConfigEntry<float> FenceLadderStep;
+        public static ConfigEntry<float> FenceLadderBelow;
         public static ConfigEntry<bool> Verbose;
 
         public static void Bind(ConfigFile config)
@@ -51,8 +53,25 @@ namespace Dovetail
                 "Metres of space left between two chained pieces. 0 places them flush. "
                 + "Negative values are ignored - overlapping pieces just clip.");
 
+            // A fence follows the ground; a chest does not. Corners give a fence two
+            // heights to attach at, its base and a full panel up, and neither is any use
+            // for running a line up a hill - so a fence gets a ladder of points up each
+            // end instead. The idea is MSchmoecker's FenceSnap, which hand-places seven
+            // rungs 0.2m apart on wood_fence; this derives them from the footprint so it
+            // works on a piece nobody has measured.
+            FenceLadderStep = config.Bind("Snapping", "FenceLadderStep", 0.2f,
+                "Vertical spacing of the snap points up each end of a fence, in metres. "
+                + "Smaller follows sloping ground more closely and costs more points per "
+                + "piece. 0 turns the ladder off and gives fences plain corners like a "
+                + "chest.");
+
+            FenceLadderBelow = config.Bind("Snapping", "FenceLadderBelow", 0.2f,
+                "How far below its own base a fence's lowest rung sits, in metres. This "
+                + "is what lets the next panel step down rather than only up.");
+
             Verbose = config.Bind("Diagnostics", "Verbose", false,
-                "Log the measured footprint of every piece that gets snap points.");
+                "Log the measured footprint of every piece that gets snap points, and the "
+                + "colliders it was measured from.");
         }
 
         // ------------------------------------------------------------------ lookups

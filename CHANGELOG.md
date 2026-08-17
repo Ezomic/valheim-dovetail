@@ -3,6 +3,38 @@
 Notable changes to Dovetail. Format follows [Keep a Changelog](https://keepachangelog.com),
 and the mod uses [semantic versioning](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+
+- **The measured footprint was too big, and fences paid for it.** A prefab carries its
+  damage states and destruction chunks inside itself (`WearNTear.m_new`, `m_worn`,
+  `m_broken`, `m_fragmentRoots`), and every collider in all of them was being measured as
+  one box. `wood_fence` came out 2.72 × 2.30 × 0.85 against a panel roughly 2.0 × 1.5, so
+  two chained fences would have stood **0.72m apart** — the exact thing this mod exists to
+  prevent. The footprint now starts at `WearNTear.m_new`, skips subtrees switched off via
+  `activeSelf`, and skips colliders on their own rigidbody the way `WearNTear.SetupColliders`
+  does.
+- Credit for catching it goes to **MSchmoecker's FenceSnap**, whose hand-placed
+  `wood_fence` points sit at x = ±1.0 against the ±1.36 measured here. Two sources
+  disagreeing is what made it findable without building a fence first.
+
+### Added
+
+- **A ladder of snap points up each end of a fence**, so a fence line can follow sloping
+  ground. Eight corners give a fence two heights to attach at, its base and a full panel up,
+  and a hill needs the heights in between. Rungs run every `FenceLadderStep` metres
+  (default 0.2) from `FenceLadderBelow` under its base (default 0.2) to its top, at
+  mid-depth on both ends, along whichever horizontal axis is longer.
+- This is **FenceSnap's idea**, taken deliberately. The difference is that the rungs come
+  off the measured footprint rather than being typed in per prefab, so a modded fence is one
+  config entry rather than a code change. `FenceLadderStep = 0` restores plain corners.
+- It knowingly gives up the uniform point set: a fence rung and a chest corner can now pair
+  and land half a piece out of line. Fences are opt-in by name, which contains it, and
+  FenceSnap made the same call.
+- `Verbose` now names every collider a footprint was measured from, not just the result.
+  Finding which collider inflates a box previously took a rip.
+
 ## [0.9.0] — 2026-08-16
 
 Not released yet. Everything below is written, deployed and confirmed loading, but the

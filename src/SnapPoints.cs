@@ -4,7 +4,9 @@ namespace Dovetail
 {
     /// <summary>
     /// Gives every container piece snap points at the eight corners of its own footprint,
-    /// so chests line up flush beside each other and stack cleanly on top.
+    /// so chests line up flush beside each other and stack cleanly on top. Fences get a
+    /// ladder of points up each end instead, so a fence line can follow sloping ground -
+    /// see UseLadder and AddLadder, and the credit to FenceSnap there.
     ///
     /// How the game snaps: Player.UpdatePlacementGhost calls FindClosestSnapPoints, which
     /// picks the globally closest pair of snap points - one on the ghost, one on a nearby
@@ -31,6 +33,7 @@ namespace Dovetail
 
             var touched = 0;
             var skipped = 0;
+            var laddered = 0;
 
             foreach (var prefab in ZNetScene.instance.m_prefabs)
             {
@@ -45,7 +48,12 @@ namespace Dovetail
                 // chest its snap points, not every chest after it in the list.
                 try
                 {
-                    if (AddCorners(prefab)) touched++;
+                    var ladder = UseLadder(prefab);
+                    if (ladder ? AddLadder(prefab) : AddCorners(prefab))
+                    {
+                        touched++;
+                        if (ladder) laddered++;
+                    }
                 }
                 catch (System.Exception e)
                 {
@@ -56,8 +64,8 @@ namespace Dovetail
 
             _applied = true;
             DovetailPlugin.Log.LogInfo(
-                "Added corner snap points to " + touched + " piece(s); "
-                + skipped + " already had their own.");
+                "Added snap points to " + touched + " piece(s), " + laddered
+                + " of them a fence ladder; " + skipped + " already had their own.");
 
             ReportMissingFences();
             return true;
@@ -149,10 +157,7 @@ namespace Dovetail
                            + (z < 0 ? "back" : "front") + "-"
                            + (x < 0 ? "left" : "right");
 
-                var point = new GameObject("snap_" + name);
-                point.tag = Tag;
-                point.transform.SetParent(prefab.transform, false);
-                point.transform.localPosition = corner;
+                Create(prefab, "snap_" + name, corner);
             }
 
             if (DovetailConfig.Verbose.Value)
@@ -161,6 +166,119 @@ namespace Dovetail
                     + " centred " + bounds.center.ToString("F2"));
 
             return true;
+        }
+
+        // ------------------------------------------------------------------ fence ladder
+
+        /// <summary>
+        /// A tall piece with a small step would otherwise carry a hundred points. The cap is
+        /// generous enough that no vanilla fence reaches it, and it is reported when it bites
+        /// rather than quietly shortening the ladder.
+        /// </summary>
+        private const int MaxRungs = 24;
+
+        /// <summary>
+        /// Fences get the ladder, everything else gets corners.
+        ///
+        /// A chest sits on a floor and stacks at its own height, so rungs would only give it
+        /// more ways to land wrong. A fence follows the ground, and corners give it exactly
+        /// two heights to attach at - its base, and a full panel up - neither of which helps
+        /// you run a line up a hill.
+        /// </summary>
+        private static bool UseLadder(GameObject prefab)
+        {
+            return DovetailConfig.SnapFences.Value
+                   && DovetailConfig.FenceLadderStep.Value > 0f
+                   && DovetailConfig.IsFence(prefab.name);
+        }
+
+        /// <summary>
+        /// Points up both ends of the piece, at mid-depth, every FenceLadderStep metres.
+        ///
+        /// Borrowed from MSchmoecker's FenceSnap, which hand-places seven rungs 0.2m apart
+        /// on wood_fence and one below its base. Deriving the rungs from the measured
+        /// footprint instead means a modded fence nobody has measured gets the same
+        /// treatment from a config entry, which is the trade this mod makes everywhere.
+        ///
+        /// This does mix point layouts across pieces, which the corner set was uniform to
+        /// avoid: a fence rung and a chest corner can now pair up and put the two half a
+        /// piece out of line. It is contained by fences being opt-in by name, and it is the
+        /// same call FenceSnap made - sloping ground is worth more than that edge.
+        /// </summary>
+        private static bool AddLadder(GameObject prefab)
+        {
+            if (!Footprint(prefab, out var bounds)) return false;
+
+            // The fence runs along whichever horizontal axis is longer. wood_fence is wide
+            // in x, piece_dvergr_sharpstakes is deep in z, and choosing wrong would put
+            // every rung on the two faces a panel never joins along.
+            var alongX = bounds.size.x >= bounds.size.z;
+
+            // Same arithmetic as the corners: snapping makes the two points one point, so
+            // each piece contributes half the gap.
+            var reach = (alongX ? bounds.extents.x : bounds.extents.z)
+                        + Mathf.Max(0f, DovetailConfig.Gap.Value) * 0.5f;
+
+            var step = DovetailConfig.FenceLadderStep.Value;
+            var bottom = bounds.min.y - Mathf.Max(0f, DovetailConfig.FenceLadderBelow.Value);
+
+            var rungs = Mathf.FloorToInt((bounds.max.y - bottom) / step) + 1;
+            var capped = rungs > MaxRungs;
+            if (capped) rungs = MaxRungs;
+
+            for (var i = 0; i < rungs; i++)
+                AddRung(prefab, bounds, alongX, reach, bottom + i * step);
+
+            // The top of the piece is what stacks one panel on another, so it is worth a
+            // rung of its own when the step does not divide the height evenly.
+            var highest = bottom + (rungs - 1) * step;
+            if (!capped && bounds.max.y - highest > step * 0.25f)
+                AddRung(prefab, bounds, alongX, reach, bounds.max.y);
+
+            if (capped)
+                DovetailPlugin.Log.LogWarning(
+                    prefab.name + " is " + bounds.size.y.ToString("F2") + "m tall and "
+                    + "FenceLadderStep is " + step + "m, which wants more than " + MaxRungs
+                    + " rungs. The ladder stops at " + highest.ToString("F2")
+                    + "m - raise the step to cover the whole piece.");
+
+            if (DovetailConfig.Verbose.Value)
+                DovetailPlugin.Log.LogInfo(
+                    prefab.name + ": footprint " + bounds.size.ToString("F2")
+                    + " centred " + bounds.center.ToString("F2")
+                    + ", ladder of " + rungs + " along " + (alongX ? "x" : "z"));
+
+            return true;
+        }
+
+        private static void AddRung(
+            GameObject prefab, Bounds bounds, bool alongX, float reach, float y)
+        {
+            foreach (var side in new[] { -1f, 1f })
+            {
+                // Mid-depth on the axis the fence does not run along. A rung on a corner
+                // would chain the panels diagonally offset by half their thickness.
+                var position = alongX
+                    ? new Vector3(bounds.center.x + reach * side, y, bounds.center.z)
+                    : new Vector3(bounds.center.x, y, bounds.center.z + reach * side);
+
+                var end = alongX
+                    ? (side < 0f ? "left" : "right")
+                    : (side < 0f ? "back" : "front");
+
+                // Height in the name rather than a rung number, because the game prints it
+                // in the HUD as you Tab through: on a slope "y0.60" tells you where you are
+                // and "rung 3" does not.
+                Create(prefab, "snap_" + end + "-y" + y.ToString("F2"), position);
+            }
+        }
+
+        private static void Create(GameObject prefab, string name, Vector3 localPosition)
+        {
+            var point = new GameObject(name);
+            point.tag = Tag;
+            point.transform.SetParent(prefab.transform, false);
+            point.transform.localPosition = localPosition;
         }
 
         // ------------------------------------------------------------------ footprint
@@ -179,29 +297,108 @@ namespace Dovetail
             bounds = default;
             var found = false;
 
-            foreach (var collider in prefab.GetComponentsInChildren<Collider>(true))
+            // Measure the piece as it will stand, not as the prefab is packaged. A built
+            // piece carries its damage states and its destruction chunks in the same
+            // prefab - WearNTear holds m_new, m_worn and m_broken as separate subtrees
+            // plus m_fragmentRoots - and GetComponentsInChildren(true) sees all of them at
+            // once. Measured that way, wood_fence came out 2.72 x 2.30 x 0.85, which is
+            // most of a metre wider and three quarters of a metre taller than the panel
+            // you actually place, so two chained fences stood 0.72m apart.
+            //
+            // Points are still parented to the prefab root, so root stays the space we
+            // convert into; only the search starts lower down.
+            var root = prefab.transform;
+            var live = LiveGeometry(prefab);
+
+            foreach (var collider in live.GetComponentsInChildren<Collider>(true))
             {
-                if (collider.isTrigger) continue;
+                if (Skip(collider, root)) continue;
                 if (!LocalBounds(collider, out var local)) continue;
 
-                var box = ToRoot(prefab.transform, collider.transform, local);
+                var box = ToRoot(root, collider.transform, local);
                 if (!found) { bounds = box; found = true; }
                 else bounds.Encapsulate(box);
+
+                // Which collider is responsible for an oversized box is the one thing you
+                // want to know when a piece snaps at the wrong distance, and it used to
+                // take a rip to find out.
+                if (DovetailConfig.Verbose.Value)
+                    DovetailPlugin.Log.LogInfo(
+                        "    " + PathTo(collider.transform, root) + " " + box.size.ToString("F2"));
             }
 
             if (found) return true;
 
             // No usable collider: fall back to the mesh, which is also pure data.
-            foreach (var filter in prefab.GetComponentsInChildren<MeshFilter>(true))
+            foreach (var filter in live.GetComponentsInChildren<MeshFilter>(true))
             {
                 if (filter.sharedMesh == null) continue;
+                if (IsDisabled(filter.transform, root)) continue;
 
-                var box = ToRoot(prefab.transform, filter.transform, filter.sharedMesh.bounds);
+                var box = ToRoot(root, filter.transform, filter.sharedMesh.bounds);
                 if (!found) { bounds = box; found = true; }
                 else bounds.Encapsulate(box);
             }
 
             return found;
+        }
+
+        /// <summary>
+        /// The subtree that will actually be standing there once the piece is placed.
+        ///
+        /// Riding WearNTear's own m_new rather than guessing at child names: it is the
+        /// field the game itself switches to when a piece is undamaged, so it is by
+        /// definition the geometry you are looking at when you line two pieces up. Pieces
+        /// without a WearNTear - and pieces whose m_new is the root itself - fall back to
+        /// the whole prefab, which is what the old behaviour was for everything.
+        /// </summary>
+        private static Transform LiveGeometry(GameObject prefab)
+        {
+            var wear = prefab.GetComponent<WearNTear>();
+            if (wear == null || wear.m_new == null || wear.m_new == prefab) return prefab.transform;
+
+            return wear.m_new.transform;
+        }
+
+        private static bool Skip(Collider collider, Transform root)
+        {
+            // A trigger is not geometry.
+            if (collider.isTrigger) return true;
+
+            // Damage states and destruction chunks sit switched off until they are needed.
+            if (IsDisabled(collider.transform, root)) return true;
+
+            // A collider hanging off its own rigidbody is a loose fragment rather than part
+            // of the piece; WearNTear.SetupColliders draws exactly the same line. The body
+            // has to be below the root to count, because a piece whose own root carries one
+            // would otherwise measure as nothing at all.
+            var body = collider.attachedRigidbody;
+            if (body != null && body.transform != root) return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Prefabs sit inactive in ZNetScene, so activeInHierarchy is false for every
+        /// object in one and tells you nothing. activeSelf is the per-object switch, and it
+        /// is what the damage states are actually held behind, so ask that instead - all
+        /// the way up to the root, since a whole disabled subtree only says so at its top.
+        /// </summary>
+        private static bool IsDisabled(Transform transform, Transform root)
+        {
+            for (var current = transform; current != null && current != root; current = current.parent)
+                if (!current.gameObject.activeSelf) return true;
+
+            return false;
+        }
+
+        private static string PathTo(Transform transform, Transform root)
+        {
+            var path = transform.name;
+            for (var parent = transform.parent; parent != null && parent != root; parent = parent.parent)
+                path = parent.name + "/" + path;
+
+            return path;
         }
 
         private static bool LocalBounds(Collider collider, out Bounds local)

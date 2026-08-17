@@ -16,7 +16,8 @@ entirety of the game's side of it, in `Piece.GetSnapPoints`. Chests and fences h
 which is exactly why they are fiddly to line up, while walls and floors are not.
 
 This mod measures each piece's own footprint at load and puts a snap point on all **eight
-corners** of it.
+corners** of it. Fences are the exception and get a **ladder** of points up each end, for
+reasons that come down to sloping ground; see below.
 
 Corners rather than face centres, because of how the game actually snaps.
 `Player.UpdatePlacementGhost` calls `FindClosestSnapPoints`, which picks the globally
@@ -34,6 +35,25 @@ Because snapping makes the two points coincide, the `Gap` setting pushes the cor
 *outward* by half its value — each of the two pieces contributes half the space between
 them. Insetting the points, which is the intuitive reading, would make them overlap by
 exactly the same arithmetic.
+
+## Fences get a ladder instead
+
+Eight corners give a fence exactly two heights to attach at: its base, and a full panel
+up. Neither is any use for running a fence up a hill, which is most of what you do with a
+fence. So a fence gets points up **both ends, at mid-depth, every `FenceLadderStep`
+metres**, starting `FenceLadderBelow` metres under its own base so the next panel can step
+down as well as up.
+
+This idea is **MSchmoecker's**, from FenceSnap. It hand-places seven rungs 0.2m apart on
+`wood_fence` plus one below the base. The difference here is that the rungs are derived
+from the measured footprint rather than typed in, so a modded fence that nobody has
+measured gets the same treatment from one config entry.
+
+It does mean two different point layouts exist, which the uniform corner set was meant to
+avoid: a fence rung and a chest corner can pair up and put the two half a piece out of
+line. That is contained by fences being opt-in by name, and it is the same trade FenceSnap
+made. Sloping ground is worth more than that edge. Set `FenceLadderStep = 0` to go back to
+plain corners.
 
 ## What gets snapped
 
@@ -61,13 +81,39 @@ than from `Collider.bounds`. Prefabs sit inactive in `ZNetScene`, and the world-
 of an inactive collider are not reliable; transforms work regardless of active state, so the
 corners are carried across by hand instead.
 
-## Note on the existing mods
+The footprint is also measured from **only the geometry that will be standing there**. A
+built piece carries its damage states and its destruction chunks inside the same prefab.
+`WearNTear` holds `m_new`, `m_worn` and `m_broken` as separate subtrees, plus
+`m_fragmentRoots`, and asking for every collider in the prefab returns all of them at
+once. Measured that way `wood_fence` came out **2.72 × 2.30 × 0.85**, which is 0.7m wider
+and 0.8m taller than the panel you actually place, and two chained fences would have stood
+**0.72m apart**. So the search starts at `WearNTear.m_new` when there is one, skips
+subtrees switched off via `activeSelf`, and skips colliders hanging off their own rigidbody
+the way `WearNTear.SetupColliders` does. `Verbose` now names every collider it measured
+from, which is how you find the culprit if a piece still snaps at the wrong distance.
 
-You already have **Frogger-ChestSnap** and **MSchmoecker-FenceSnap** in other profiles.
-This replaces both. ChestSnap in particular dates from **September 2022** and works from a
-hardcoded prefab list, so it predates several game and Unity versions.
+## Credit where it is due
 
-Do not run this alongside either — it skips pieces that already have snap points, so
+This mod is written from scratch and shares no code with anything else, but it does not
+pretend to have invented the idea. Two mods came first and both are worth naming.
+
+**FenceSnap**, by **MSchmoecker**. The ladder of points up each end of a fence is its idea,
+and its hand-tuned numbers are also what caught a bug here: FenceSnap puts `wood_fence`
+points at x = ±1.0, this mod's measured box said ±1.36, and one of those had to be wrong.
+It was this one. Without a second opinion to compare against, that 0.72m gap would have
+been found by building a fence.
+
+**ChestSnap**, by **Frogger**. The original chest snapping mod, and the reason anyone knows
+chests are worth snapping at all. Now at 0.1.1 and driven by a YAML file of snap point
+data, so custom and modded containers are added by editing config rather than by waiting
+for an update.
+
+**Extra Snap Points Made Easy**, by **Searica**, is the broadest mod in this space at 2.0.5
+and does far more than this one: manual snapping with keybinds to cycle points, grid
+snapping, and points added by piece shape across beams, triangles, rectangles and roofs. If
+you want the whole toolbox rather than chests and fences that line up, use it instead.
+
+Do not run this alongside any of them. It skips pieces that already have snap points, so
 whichever registers first wins, which is a coin toss rather than a decision.
 
 ## Building
@@ -103,7 +149,9 @@ Solo, none of that applies and Core is not needed at all.
 | `FencePrefabs` | see below | Comma-separated prefab names treated as fences |
 | `ExcludePrefabs` | | Comma-separated names to leave alone whatever else matches |
 | `Gap` | `0` | Metres left between chained pieces; `0` is flush |
-| `Verbose` | `false` | Log the measured footprint of every piece that gets points |
+| `FenceLadderStep` | `0.2` | Vertical spacing of a fence's rungs; `0` gives fences plain corners |
+| `FenceLadderBelow` | `0.2` | How far under its own base a fence's lowest rung sits |
+| `Verbose` | `false` | Log the measured footprint of every piece that gets points, and the colliders behind it |
 
 `FencePrefabs` defaults to `wood_fence, piece_sharpstakes, piece_stakewall_blackwood,
 piece_dvergr_sharpstakes, piece_dvergr_stake_wall`.
@@ -115,14 +163,19 @@ the source.
 
 1. Place a chest, then bring up a second — it should snap flush alongside, and stack when
    aimed above.
-2. Place a wood fence and chain a second onto its end.
+2. Place a wood fence and chain a second onto its end. Then chain one **up a slope**, which
+   is what the ladder is for.
 3. Same for sharp stakes.
-4. **Read the startup log** for a `FencePrefabs names that match no prefab` warning — the
+4. **Check the measured fence in the log.** With `Verbose = true`, `wood_fence` should now
+   report a footprint close to 2.0m wide rather than the 2.72m it reported before, which
+   would have left a 0.72m gap between panels. If it still says 2.72, the inflation is not
+   coming from the damage states and the collider lines underneath it will say what it is.
+5. **Read the startup log** for a `FencePrefabs names that match no prefab` warning — the
    default list is inferred from the asset manifest, so an entry may need correcting.
-5. **Tab** cycles snap points manually; the HUD names them (`snap_top-front-left`), which
-   is why they are named by position rather than numbered.
-6. Set `Verbose = true` once and read the measured footprints if a piece snaps at the wrong
-   distance.
+6. **Tab** cycles snap points manually; the HUD names them, which is why they are named by
+   position (`snap_top-front-left`) and a fence's rungs by height (`snap_left-y0.60`).
+7. Set `Verbose = true` once and read the measured footprints if a piece snaps at the wrong
+   distance. Each footprint is now followed by the colliders it was measured from.
 
 ## Author
 
