@@ -57,7 +57,20 @@ plain corners.
 
 ## What gets snapped
 
-Three ways in, in descending order of confidence that snapping is wanted:
+First, a precondition: **the piece has to be something you can actually build**
+(`BuildablePiecesOnly`, on). Having a `Piece` component is not the same as being buildable,
+and the gap is not small. Matching on components alone gave snap points to 35 prefabs out
+of 46 that you can never place: 24 `TreasureChest_*` variants, nine pots, two loose loot
+chests. The cost was not the wasted transforms. Snap points work both ways, so a chest
+carried into a crypt snapped itself to the loot chests already standing there, and a
+barrow's pottery became a snap target for a wall.
+
+The set is read off the game's own piece tables rather than guessed at. Every buildable
+piece sits in the `PieceTable` of some tool, via `ItemDrop.m_itemData.m_shared.m_buildPieces`,
+so the Hammer, Hoe, Cultivator and any modded tool with its own table all contribute and
+nothing needs naming.
+
+Then, three ways in, in descending order of confidence that snapping is wanted:
 
 **Containers**, matched on components rather than names — anything with both a `Piece` and
 a `Container`. Modded chests are covered without a list to maintain, and nothing rots when
@@ -91,6 +104,43 @@ and 0.8m taller than the panel you actually place, and two chained fences would 
 subtrees switched off via `activeSelf`, and skips colliders hanging off their own rigidbody
 the way `WearNTear.SetupColliders` does. `Verbose` now names every collider it measured
 from, which is how you find the culprit if a piece still snaps at the wrong distance.
+
+## When derivation gets it wrong
+
+One axis-aligned box cannot describe an L-shape or a piece whose geometry sits off centre,
+and no amount of care will change that. `piece_dvergr_sharpstakes` measures
+2.40 × 1.70 × 3.94 centred 0.35 off in x, so the corners of its box are nowhere near the
+actual stakes. Both mods that came before this one ended up needing per-prefab data for the
+same reason: FenceSnap hand-places its gate points, and ChestSnap moved to a YAML file of
+them.
+
+So `PointOverrides` takes exact points for named prefabs:
+
+```
+PointOverrides = piece_dvergr_sharpstakes: -0.5,0,2 | -0.5,0,-2 ; wooden_fence_1_gate: -2.4,0,0 | -2.4,1.17,0
+```
+
+Semicolons separate prefabs, a colon follows the name, pipes separate points, commas
+separate one point's three coordinates. **Decimals must use a dot**, since a comma already
+means something here. Naming a prefab is enough to get it snapped, so it does not also have
+to be a container or a listed fence, and it skips the buildable filter as well: an explicit
+name is more specific than any heuristic. `ExcludePrefabs` still wins, or it would not be an
+escape hatch you could get back out of. `Gap` and the ladder do not apply, because a point
+given by hand is used exactly as written. Names matching no prefab are reported at startup
+like the fence list.
+
+## Pieces the game can never find
+
+`Piece.GetSnapPoints` finds neighbours with
+`Physics.OverlapSphereNonAlloc(..., s_pieceRayMask)`, and that mask is
+`LayerMask.GetMask("piece", "piece_nonsolid")`. A modded piece whose colliders were left on
+another layer is invisible to that search, so snap points on it can never be found by
+anything, however correct they are.
+
+Dovetail says so in the log and leaves it there. Both ChestSnap and FenceSnap carry a
+`FixPiece` that rewrites every collider onto the piece layer, and that is a real fix, but it
+changes what those colliders collide with. That is too large a side effect to apply silently
+to somebody else's content, and the piece belongs to whoever shipped it.
 
 ## Credit where it is due
 
@@ -146,6 +196,8 @@ Solo, none of that applies and Core is not needed at all.
 | `SnapContainers` | `true` | Snap anything buildable that holds items |
 | `SnapFences` | `true` | Snap the pieces named in `FencePrefabs` |
 | `SnapUnsnappedPieces` | `false` | Snap every buildable piece with no snap points of its own |
+| `BuildablePiecesOnly` | `true` | Only snap pieces that appear in a build menu |
+| `PointOverrides` | | Exact points for named prefabs, replacing anything derived |
 | `FencePrefabs` | see below | Comma-separated prefab names treated as fences |
 | `ExcludePrefabs` | | Comma-separated names to leave alone whatever else matches |
 | `Gap` | `0` | Metres left between chained pieces; `0` is flush |

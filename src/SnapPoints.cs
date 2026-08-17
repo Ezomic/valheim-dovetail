@@ -23,19 +23,40 @@ namespace Dovetail
     {
         private const string Tag = "snappoint";
 
-        private static bool _applied;
+        /// <summary>
+        /// The scene this has already been done to, rather than a plain bool.
+        ///
+        /// "Idempotent" here has to mean per world, not per process. Loading a second world -
+        /// including logging out to the menu and back in - tears down ZNetScene and builds a
+        /// new one, and a static bool would answer yes for the rest of the session while the
+        /// new scene had never been touched. That is the failure recorded in CLAUDE.md that
+        /// silently destroyed a built piece in another mod, and the fix there is the same as
+        /// here: ask the world, do not answer from a field.
+        ///
+        /// This is cheap to get wrong in the safe direction. If prefab assets do keep the
+        /// points across a reload, the second pass finds them all under "already had their
+        /// own" and does nothing, and the log then says so plainly either way.
+        /// </summary>
+        private static ZNetScene _appliedTo;
 
         /// <summary>Idempotent, and safe to call every frame until it takes.</summary>
         public static bool Apply()
         {
-            if (_applied) return true;
-            if (ZNetScene.instance == null) return false;
+            var scene = ZNetScene.instance;
+            if (scene == null) return false;
+            if (_appliedTo == scene) return true;
+
+            // The buildable set is read off the piece tables, which live on items in
+            // ObjectDB, so there is nothing to filter by until ObjectDB is up. Waiting is
+            // safe: Update calls this every frame, and pieces are instantiated later.
+            if (!Buildable.Ready()) return false;
 
             var touched = 0;
             var skipped = 0;
             var laddered = 0;
+            var custom = 0;
 
-            foreach (var prefab in ZNetScene.instance.m_prefabs)
+            foreach (var prefab in scene.m_prefabs)
             {
                 if (prefab == null) continue;
                 if (!Eligible(prefab)) continue;
@@ -48,11 +69,18 @@ namespace Dovetail
                 // chest its snap points, not every chest after it in the list.
                 try
                 {
-                    var ladder = UseLadder(prefab);
-                    if (ladder ? AddLadder(prefab) : AddCorners(prefab))
+                    var points = DovetailConfig.PointOverride(prefab.name);
+                    var ladder = points == null && UseLadder(prefab);
+
+                    var added = points != null
+                        ? AddExact(prefab, points)
+                        : ladder ? AddLadder(prefab) : AddCorners(prefab);
+
+                    if (added)
                     {
                         touched++;
-                        if (ladder) laddered++;
+                        if (points != null) custom++;
+                        else if (ladder) laddered++;
                     }
                 }
                 catch (System.Exception e)
@@ -60,14 +88,80 @@ namespace Dovetail
                     DovetailPlugin.Log.LogWarning(
                         "Could not snap " + prefab.name + ": " + e.Message);
                 }
+
+                WarnIfUnreachable(prefab);
             }
 
-            _applied = true;
+            _appliedTo = scene;
             DovetailPlugin.Log.LogInfo(
-                "Added snap points to " + touched + " piece(s), " + laddered
-                + " of them a fence ladder; " + skipped + " already had their own.");
+                "Added snap points to " + touched + " piece(s): " + laddered
+                + " fence ladder, " + custom + " from PointOverrides, "
+                + (touched - laddered - custom) + " corners. " + skipped
+                + " already had their own.");
 
-            ReportMissingFences();
+            ReportMissingNames();
+            return true;
+        }
+
+        /// <summary>
+        /// A piece whose colliders sit outside the mask the game searches with can never be
+        /// found by the snapping code at all, so the points it just got are decoration.
+        ///
+        /// Piece.GetSnapPoints finds neighbours through
+        /// Physics.OverlapSphereNonAlloc(..., s_pieceRayMask), and that mask is
+        /// LayerMask.GetMask("piece", "piece_nonsolid"). A modded piece left on Default is
+        /// invisible to it.
+        ///
+        /// Both ChestSnap and FenceSnap carry a FixPiece that rewrites every collider onto
+        /// the piece layer. This deliberately does not: moving another mod's colliders to a
+        /// different layer changes what they collide with, which is far too large a side
+        /// effect to apply silently to somebody else's content. Saying so is this mod's
+        /// existing habit - the same as it does for a fence name that matches no prefab -
+        /// and it leaves the fix with whoever owns the piece.
+        /// </summary>
+        private static void WarnIfUnreachable(GameObject prefab)
+        {
+            var reachable = false;
+            var any = false;
+
+            foreach (var collider in prefab.GetComponentsInChildren<Collider>(true))
+            {
+                if (collider.isTrigger) continue;
+
+                any = true;
+                if ((PieceMask & (1 << collider.gameObject.layer)) != 0) { reachable = true; break; }
+            }
+
+            if (!any || reachable) return;
+
+            DovetailPlugin.Log.LogWarning(
+                prefab.name + " has snap points now, but none of its colliders are on the "
+                + "piece or piece_nonsolid layer, which is where the game looks for something "
+                + "to snap to. Nothing will ever find them. That is the piece's own layer "
+                + "setup, not something this mod will change for it.");
+        }
+
+        private static int _pieceMask;
+
+        private static int PieceMask
+        {
+            get
+            {
+                if (_pieceMask == 0) _pieceMask = LayerMask.GetMask("piece", "piece_nonsolid");
+                return _pieceMask;
+            }
+        }
+
+        /// <summary>Points given verbatim in config, with no gap and no ladder applied.</summary>
+        private static bool AddExact(GameObject prefab, Vector3[] points)
+        {
+            for (var i = 0; i < points.Length; i++)
+                Create(prefab, "snap_custom" + (i + 1), points[i]);
+
+            if (DovetailConfig.Verbose.Value)
+                DovetailPlugin.Log.LogInfo(
+                    prefab.name + ": " + points.Length + " point(s) from PointOverrides");
+
             return true;
         }
 
@@ -76,18 +170,24 @@ namespace Dovetail
         /// silently - which is exactly how you spend an evening wondering why one fence
         /// still will not line up. Say so instead.
         /// </summary>
-        private static void ReportMissingFences()
+        private static void ReportMissingNames()
         {
-            if (!DovetailConfig.SnapFences.Value) return;
+            if (DovetailConfig.SnapFences.Value)
+                Report("FencePrefabs", DovetailConfig.ConfiguredFences());
 
+            Report("PointOverrides", DovetailConfig.ConfiguredOverrides());
+        }
+
+        private static void Report(string setting, System.Collections.Generic.IEnumerable<string> names)
+        {
             var missing = new System.Collections.Generic.List<string>();
-            foreach (var name in DovetailConfig.ConfiguredFences())
+            foreach (var name in names)
                 if (ZNetScene.instance.GetPrefab(name) == null) missing.Add(name);
 
             if (missing.Count == 0) return;
 
             DovetailPlugin.Log.LogWarning(
-                "FencePrefabs names that match no prefab: " + string.Join(", ", missing.ToArray()));
+                setting + " names that match no prefab: " + string.Join(", ", missing.ToArray()));
         }
 
         /// <summary>
@@ -114,7 +214,19 @@ namespace Dovetail
             // is not what anyone means by chaining storage.
             if (prefab.GetComponent<Ship>() != null) return false;
 
+            // Exclusions win over everything, including an override - the setting says
+            // "whatever else matches", and a list you cannot override is not an escape hatch.
             if (DovetailConfig.IsExcluded(prefab.name)) return false;
+
+            // Naming a prefab in PointOverrides is a decision, so it does not have to qualify
+            // some other way and it skips the buildable filter too - an explicit name is more
+            // specific than any heuristic here, and someone naming a loot chest to snap their
+            // own pieces against has said what they want. It still loses to an exclusion.
+            var named = DovetailConfig.HasPointOverride(prefab.name);
+
+            if (!named && !Buildable.Includes(prefab)) return false;
+
+            if (named) return true;
 
             if (DovetailConfig.SnapContainers.Value && prefab.GetComponent<Container>() != null)
                 return true;

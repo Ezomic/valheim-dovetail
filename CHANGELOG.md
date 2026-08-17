@@ -21,6 +21,23 @@ and the mod uses [semantic versioning](https://semver.org).
 
 ### Added
 
+- **Only buildable pieces are snapped** (`BuildablePiecesOnly`, on). Having a `Piece`
+  component is not the same as being placeable: 35 of the 46 prefabs previously snapped were
+  dungeon loot chests, pots and other things you cannot build. Snap points work both ways, so
+  a chest carried into a crypt snapped to the loot chests standing there. The set is read off
+  the game's own piece tables via `ItemDrop.m_itemData.m_shared.m_buildPieces`, so every tool
+  including modded ones contributes and nothing needs naming.
+- **`PointOverrides`, exact points for named prefabs.** One axis-aligned box cannot describe
+  an L-shape or an off-centre piece, and `piece_dvergr_sharpstakes` is the proof at
+  2.40 × 1.70 × 3.94 centred 0.35 off in x. Both earlier mods needed per-prefab data too:
+  FenceSnap hand-places its gate points and ChestSnap keeps a YAML file of them. Naming a
+  prefab is enough to get it snapped and skips the buildable filter, `ExcludePrefabs` still
+  wins, and `Gap` and the ladder do not apply to a point given by hand.
+- **A warning for pieces the game can never find.** `Piece.GetSnapPoints` searches with
+  `LayerMask.GetMask("piece", "piece_nonsolid")`, so a modded piece left on another layer is
+  invisible to snapping however correct its points are. ChestSnap and FenceSnap both rewrite
+  such colliders onto the piece layer; this deliberately does not, because that changes what
+  they collide with and the piece belongs to whoever shipped it. It says so instead.
 - **A ladder of snap points up each end of a fence**, so a fence line can follow sloping
   ground. Eight corners give a fence two heights to attach at, its base and a full panel up,
   and a hill needs the heights in between. Rungs run every `FenceLadderStep` metres
@@ -34,6 +51,13 @@ and the mod uses [semantic versioning](https://semver.org).
   FenceSnap made the same call.
 - `Verbose` now names every collider a footprint was measured from, not just the result.
   Finding which collider inflates a box previously took a rip.
+- **Applying is now tracked per world rather than per process.** It keyed off a static bool,
+  which answers yes for the rest of the session once set, while logging out to the menu and
+  back in tears down `ZNetScene` and builds a new one. That is the failure CLAUDE.md records
+  as having silently destroyed a built piece elsewhere, and the fix is the same: ask the
+  world, do not answer from a field. If prefab assets do keep their points across a reload
+  the second pass simply finds them under "already had their own", and the log now says
+  which happened.
 
 ## [0.9.0] — 2026-08-16
 
