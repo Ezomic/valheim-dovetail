@@ -11,7 +11,7 @@ and the mod uses [semantic versioning](https://semver.org).
   damage states and destruction chunks inside itself (`WearNTear.m_new`, `m_worn`,
   `m_broken`, `m_fragmentRoots`), and every collider in all of them was being measured as
   one box. `wood_fence` came out 2.72 × 2.30 × 0.85 against a panel roughly 2.0 × 1.5, so
-  two chained fences would have stood **0.72m apart** — the exact thing this mod exists to
+  two chained fences would have stood **0.72m apart**, the exact thing this mod exists to
   prevent. The footprint now starts at `WearNTear.m_new`, skips subtrees switched off via
   `activeSelf`, and skips colliders on their own rigidbody the way `WearNTear.SetupColliders`
   does.
@@ -62,7 +62,7 @@ and the mod uses [semantic versioning](https://semver.org).
   the second pass simply finds them under "already had their own", and the log now says
   which happened.
 
-## [0.9.0] — 2026-08-16
+## [0.9.0] - 2026-08-16
 
 Not released yet. Everything below is written, deployed and confirmed loading, but the
 snapping has only been loaded and not yet played. The version stays under 1.0 until it has,
@@ -84,7 +84,7 @@ and 1.0.0 will be the release.
 
 ### What gets snapped
 
-- **Containers**, matched on components rather than names — anything with both a `Piece` and
+- **Containers**, matched on components rather than names: anything with both a `Piece` and
   a `Container`. Modded chests are covered without a list to maintain. Ships are excluded.
 - **Fences**, matched by name, because nothing about a fence's components distinguishes it
   from any other wall. The list is config rather than code, and any configured name matching
@@ -98,7 +98,7 @@ and 1.0.0 will be the release.
 
 - Footprints are read from collider **data** rather than from `Collider.bounds`. Prefabs sit
   inactive in `ZNetScene`, where world-space bounds have never been computed and read as
-  zero — exactly when they are wanted.
+  zero, exactly when they are wanted.
 - Loads on dedicated servers.
 - **Core is optional.** Installed, it is used: the mod joins Core's version gate, which
   compares mod versions and build ids on connect and refuses a client that disagrees. That

@@ -1,7 +1,7 @@
 # Dovetail
 
 Chests and fences that line up. Place one, and the next snaps flush beside it or squarely
-on top — no nudging, no eyeballing, no gaps you only notice after you have built the wall.
+on top, with no nudging, no eyeballing, no gaps you only notice after you have built the wall.
 
 Built against the installed game (0.221.12, Unity 6000.0.61, BepInEx 5.4.23.3, Harmony 2.9).
 Single DLL, no asset bundle.
@@ -45,14 +45,14 @@ naming.
 
 Then, three ways in, in descending order of confidence that snapping is wanted:
 
-**Containers**, matched on components rather than names — anything with both a `Piece` and
+**Containers**, matched on components rather than names: anything with both a `Piece` and
 a `Container`. Modded chests are covered without a list to maintain, and nothing rots when
 a prefab is renamed. Ships are excluded; they hold cargo and are technically pieces, but
 snapping a longship to a chest is not what anyone means by chaining storage.
 
 **Fences**, matched by name, because nothing about a fence's components distinguishes it
 from any other wall. The list is config rather than code, so a wrong or outdated entry is
-something you fix without a build — and any configured name that matches no prefab is
+something you fix without a build, and any configured name that matches no prefab is
 **reported in the log at startup** rather than silently doing nothing.
 
 **Everything else the developers never gave snap points to** (`SnapUnsnappedPieces`, off by
@@ -135,8 +135,8 @@ Dovetail installs and runs on its own. [Core](https://github.com/Ezomic/valheim-
 **soft** dependency: present, it is used; absent, nothing here is degraded. Installing
 Dovetail from Thunderstore no longer installs Core with it.
 
-What Core adds is the **version gate** — a handshake that compares mod versions and build
-ids on connect and refuses a client that does not match. Without it nothing reports two ends running different builds, and this adds child transforms to shared prefabs — so a disagreement about a prefab passes unnoticed.
+What Core adds is the **version gate**, a handshake that compares mod versions and build
+ids on connect and refuses a client that does not match. Without it nothing reports two ends running different builds, and this adds child transforms to shared prefabs, so a disagreement about a prefab passes unnoticed.
 
 Solo, none of that applies and Core is not needed at all.
 
@@ -161,7 +161,7 @@ Solo, none of that applies and Core is not needed at all.
 `FencePrefabs` defaults to `wood_fence, piece_sharpstakes, piece_stakewall_blackwood,
 piece_dvergr_sharpstakes, piece_dvergr_stake_wall`.
 
-A value already written to the `.cfg` beats a new default in code — change the `.cfg`, not
+A value already written to the `.cfg` beats a new default in code. Change the `.cfg`, not
 the source.
 
 ## Design notes
@@ -173,4 +173,4 @@ had to exclude, and why the one-way pieces are reported rather than fixed:
 ## Author
 
 Dovetail is an original mod by **Robbin Thijssen** (Thijssen Software).
-Copyright (c) 2026 Robbin Thijssen. MIT licensed — see `LICENSE`.
+Copyright (c) 2026 Robbin Thijssen. MIT licensed. See `LICENSE`.

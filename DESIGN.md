@@ -5,7 +5,7 @@ see the [README](README.md).
 
 ## How it works
 
-A snap point in Valheim is nothing but a child transform tagged `snappoint` — that is the
+A snap point in Valheim is nothing but a child transform tagged `snappoint`, and that is the
 entirety of the game's side of it, in `Piece.GetSnapPoints`. Chests and fences have none,
 which is exactly why they are fiddly to line up, while walls and floors are not.
 
@@ -15,7 +15,7 @@ reasons that come down to sloping ground; see below.
 
 Corners rather than face centres, because of how the game actually snaps.
 `Player.UpdatePlacementGhost` calls `FindClosestSnapPoints`, which picks the globally
-closest pair of points — one on the ghost, one on a nearby placed piece — within 0.5m, and
+closest pair of points, one on the ghost and one on a nearby placed piece, within 0.5m, and
 then moves the ghost so **the two points become the same point**. Under that rule:
 
 - a ghost's left corner landing on a placed piece's right corner is flush adjacency
@@ -26,7 +26,7 @@ Mixing in face centres would let a corner snap to a centre and put a piece half 
 length out of line, so the set is deliberately uniform.
 
 Because snapping makes the two points coincide, the `Gap` setting pushes the corners
-*outward* by half its value — each of the two pieces contributes half the space between
+*outward* by half its value: each of the two pieces contributes half the space between
 them. Insetting the points, which is the intuitive reading, would make them overlap by
 exactly the same arithmetic.
 
@@ -92,7 +92,7 @@ to somebody else's content, and the piece belongs to whoever shipped it.
 
 ## What to check
 
-1. Place a chest, then bring up a second — it should snap flush alongside, and stack when
+1. Place a chest, then bring up a second. It should snap flush alongside, and stack when
    aimed above.
 2. Place a wood fence and chain a second onto its end. Then chain one **up a slope**, which
    is what the ladder is for.
@@ -101,7 +101,7 @@ to somebody else's content, and the piece belongs to whoever shipped it.
    report a footprint close to 2.0m wide rather than the 2.72m it reported before, which
    would have left a 0.72m gap between panels. If it still says 2.72, the inflation is not
    coming from the damage states and the collider lines underneath it will say what it is.
-5. **Read the startup log** for a `FencePrefabs names that match no prefab` warning — the
+5. **Read the startup log** for a `FencePrefabs names that match no prefab` warning. The
    default list is inferred from the asset manifest, so an entry may need correcting.
 6. **Tab** cycles snap points manually; the HUD names them, which is why they are named by
    position (`snap_top-front-left`) and a fence's rungs by height (`snap_left-y0.60`).
