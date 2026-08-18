@@ -5,6 +5,14 @@ and the mod uses [semantic versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Changed
+
+- **Core is gone entirely.** Dovetail no longer references Core, declares it as a soft
+  dependency, or registers with its version gate. It was already optional; now it is absent.
+  Nothing here has to agree with anything running elsewhere, which is what lets this be
+  played and versioned on its own. The gate is what is given up: nothing reports two ends
+  running different builds of it.
+
 ### Fixed
 
 - **The measured footprint was too big, and fences paid for it.** A prefab carries its

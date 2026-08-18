@@ -129,16 +129,15 @@ Deploys to the repo-local `testprofile\`. Override with `-p:ProfileDir=...`, or 
 into the shared play profile with `valheim-own-profile\build-all.ps1`.
 
 
-## Core is optional
+## No dependencies at all
 
-Dovetail installs and runs on its own. [Core](https://github.com/Ezomic/valheim-core) is a
-**soft** dependency: present, it is used; absent, nothing here is degraded. Installing
-Dovetail from Thunderstore no longer installs Core with it.
+Dovetail needs nothing but BepInEx. It does not use [Core](https://github.com/Ezomic/valheim-core)
+and does not register with its version gate, so there is no handshake to fail and no other
+mod it has to agree with. Install it on its own.
 
-What Core adds is the **version gate**, a handshake that compares mod versions and build
-ids on connect and refuses a client that does not match. Without it nothing reports two ends running different builds, and this adds child transforms to shared prefabs, so a disagreement about a prefab passes unnoticed.
-
-Solo, none of that applies and Core is not needed at all.
+What that gives up is the gate itself. Nothing will tell you when two players are running
+different builds of this, and it does add child transforms to shared prefabs, so a
+disagreement passes unnoticed. Solo, none of that applies.
 
 ## Config
 
